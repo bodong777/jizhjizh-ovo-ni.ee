@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Account Diary</title>
+  
+  <!-- PWA 支持与应用配置 -->
+  <meta name="application-name" content="Account Diary">
+  <meta name="apple-mobile-web-app-title" content="Account Diary">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#F2F3F5">
+  <link rel="apple-touch-icon" href="https://image.58sb.cn/file/img/eTzTvE2J.jpg">
+  <link rel="icon" type="image/jpeg" href="https://image.58sb.cn/file/img/eTzTvE2J.jpg">
+  <link rel="manifest" id="pwaManifestLink">
+  <style>
+    :root {
+      /* 纯粹灰白调：低饱和、温和、轻盈 */
+      --bg-base: #F2F3F5;
+      --text-main: #474A51;      /* 柔和石墨灰，拒绝死黑 */
+      --text-sub: #989CA5;       /* 浅雾灰 */
+      --text-light: #B4B8C1;     /* 极淡灰 */
+      --glass-base: rgba(255, 255, 255, 0.65);
+      --glass-border: rgba(255, 255, 255, 0.85);
+      --glass-shadow: 0 12px 30px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(255, 255, 255, 0.9) inset;
+      --capsule-active: #FFFFFF;
+      --spring-easing: cubic-bezier(0.34, 1.45, 0.64, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* 移动端全屏防溢出：采用 dvh 确保导航栏百分百不被移出屏幕 */
+    html, body {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    /* 背景柔化极淡漫反射球 */
+    .ambient-sphere {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(70px);
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    .sphere-1 {
+      width: 260px;
+      height: 260px;
+      background: #E8EBF0;
+      top: 5%;
+      left: -40px;
+    }
+    .sphere-2 {
+      width: 300px;
+      height: 300px;
+      background: #ECEFF4;
+      bottom: 12%;
+      right: -40px;
+    }
+
+    /* 页面主容器 */
+    .viewport {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    .page {
+      position: absolute;
+      inset: 0;
+      /* 顶部间距收拢，紧凑精致 */
+      padding: 24px 24px 100px;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(0);
+      will-change: transform, opacity;
+    }
+
+    .page.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    /* 顶部微标：紧凑贴合大标题 */
+    .brand-glass-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      margin-bottom: 10px; /* 间距紧致，不再大面积空旷 */
+      width: fit-content;
+    }
+
+    .brand-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--text-sub);
+    }
+
+    .brand-text {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-sub);
+      letter-spacing: 0.2px;
+    }
+
+    .page-header {
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: -0.4px;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+
+    .page-sub {
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+
+    /* Chat 页面全屏正中间居中提示容器 */
+    .chat-dev-center-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-top: -40px;
+      gap: 12px;
+      pointer-events: none;
+    }
+    .chat-dev-center-icon {
+      width: 44px;
+      height: 44px;
+      stroke: var(--text-light);
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+    .chat-dev-center-text {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-sub);
+      letter-spacing: 0.3px;
+    }
+
+    /* 顶部或底部温和 PWA 浏览器直接安装弹条 */
+    .pwa-install-banner {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-120%);
+      width: calc(100% - 32px);
+      max-width: 380px;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      border-radius: 16px;
+      padding: 10px 14px;
+      box-shadow: 0 8px 24px rgba(71, 74, 81, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 1200;
+      transition: transform 0.4s cubic-bezier(0.34, 1.3, 0.64, 1);
+    }
+    .pwa-install-banner.show {
+      transform: translateX(-50%) translateY(0);
+    }
+    .pwa-app-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      object-fit: cover;
+      margin-right: 10px;
+    }
+    .pwa-install-btn {
+      padding: 6px 14px;
+      border-radius: 10px;
+      background: var(--text-main);
+      color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* ====== 底部液态玻璃悬浮导航栏（防沉底） ====== */
+    .nav-container {
+      position: absolute;
+      left: 50%;
+      bottom: max(16px, env(safe-area-inset-bottom, 16px));
+      transform: translateX(-50%);
+      z-index: 999;
+      width: calc(100% - 32px);
+      max-width: 390px;
+      height: 64px;
+    }
+
+    .liquid-glass-dock {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 32px;
+      background: var(--glass-base);
+      backdrop-filter: blur(24px) saturate(160%);
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 0 4px;
+    }
+
+    /* 玻璃上沿极细液态反射弧面 */
+    .liquid-glass-dock::before {
+      content: '';
+      position: absolute;
+      top: 1px;
+      left: 14px;
+      right: 14px;
+      height: 40%;
+      border-radius: 30px 30px 14px 14px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 100%);
+      pointer-events: none;
+    }
+
+    /* 像水滴流动拉伸的背底滑块 */
+    .liquid-droplet-capsule {
+      position: absolute;
+      top: 5px;
+      left: 0;
+      height: calc(100% - 10px);
+      background: var(--capsule-active);
+      border-radius: 26px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04), 0 0.5px 0.5px rgba(0, 0, 0, 0.06);
+      z-index: 1;
+      pointer-events: none;
+      will-change: transform, width, left;
+    }
+
+    /* Tab 项 */
+    .tab-item {
+      position: relative;
+      z-index: 2;
+      flex: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-light); /* 未选中时是淡灰 */
+      transition: color 0.3s ease;
+      gap: 3px;
+    }
+
+    .tab-item.active {
+      color: var(--text-main); /* 选中时温和石墨灰 */
+    }
+
+    .tab-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center center;
+    }
+
+    .tab-icon svg {
+      width: 100%;
+      height: 100%;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: stroke 0.25s ease;
+    }
+
+    .tab-label {
+      font-size: 10px;
+      font-weight: 400;
+      letter-spacing: -0.2px;
+      transition: font-weight 0.2s ease;
+    }
+
+    .tab-item.active .tab-label {
+      font-weight: 600;
+    }
+
+    /* 中间加号：采用低饱和灰白玻璃浮雕（摒弃纯黑） */
+    .tab-item.action-center {
+      flex: 0 0 50px;
+      height: 50px;
+      z-index: 5;
+    }
+
+    .plus-bubble {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #FFFFFF 0%, #E8EAEF 100%);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), inset 0 1px 2px rgba(255, 255, 255, 1);
+      transition: transform 0.25s var(--spring-easing);
+    }
+
+    .plus-bubble svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--text-main);
+      stroke-width: 2.2;
+    }
+
+    .plus-bubble:active {
+      transform: scale(0.92);
+    }
+
+    /* 图标缩进回弹动画 (Pop / Bounce) */
+    @keyframes iconPop {
+      0% { transform: scale(1); }
+      32% { transform: scale(0.75); }
+      70% { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+
+    .tab-item.pop-trigger .tab-icon {
+      animation: iconPop 0.4s var(--spring-easing) forwards;
+    }
+
+    /* ===== 自由拖拽悬浮加号 ===== */
+    .draggable-fab {
+      position: fixed;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #FFFFFF 0%, #E8EBF0 100%);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08), inset 0 1px 2px #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-main);
+      z-index: 90;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .draggable-fab:active {
+      cursor: grabbing;
+      transform: scale(0.92);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+    .draggable-fab svg {
+      width: 22px;
+      height: 22px;
+      stroke: var(--text-main);
+      stroke-width: 2.2;
+      pointer-events: none;
+    }
+
+    /* ===== 左侧时间轴与节点滚动联动 ===== */
+    .timeline-scroll-view {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      margin-top: 14px;
+      padding-bottom: 90px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .timeline-scroll-view::-webkit-scrollbar {
+      display: none;
+    }
+
+    .timeline-container {
+      position: relative;
+      padding-left: 28px;
+      min-height: 100%;
+    }
+
+    /* 时间轴静态背底线 */
+    .timeline-line {
+      position: absolute;
+      top: 14px;
+      bottom: 20px;
+      left: 7px;
+      width: 2px;
+      background: rgba(152, 156, 165, 0.2);
+      border-radius: 2px;
+    }
+
+    /* 随滚动向下滑动的动态进度指示线 */
+    .timeline-progress {
+      position: absolute;
+      top: 14px;
+      left: 7px;
+      width: 2px;
+      height: 0px;
+      background: var(--text-main);
+      border-radius: 2px;
+      transition: height 0.15s ease-out;
+    }
+
+    /* 记账项单元 */
+    .timeline-item {
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    /* 时间轴小爱心节点（低饱和灰、极简质感） */
+    .timeline-node {
+      position: absolute;
+      left: -29px;
+      top: 14px;
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s ease, filter 0.3s ease;
+      z-index: 2;
+    }
+    .timeline-node svg {
+      width: 14px;
+      height: 14px;
+      fill: #D3D6DC;           /* 未激活时是淡雾灰爱心 */
+      stroke: none;
+      transition: fill 0.3s ease, transform 0.3s ease;
+    }
+    .timeline-item.active .timeline-node {
+      transform: scale(1.22);
+      filter: drop-shadow(0 2px 5px rgba(71, 74, 81, 0.15));
+    }
+    .timeline-item.active .timeline-node svg {
+      fill: var(--text-main);  /* 激活时呈现温和低饱和石墨灰 */
+    }
+
+    /* 记账卡片 */
+    .record-card {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      border-radius: 18px;
+      padding: 14px 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.02);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .timeline-item.active .record-card {
+      border-color: rgba(255, 255, 255, 1);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
+    }
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .card-tag {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 8px;
+      background: #E8EBF0;
+      color: var(--text-main);
+      font-weight: 500;
+    }
+    .card-tag.income {
+      background: #E2E8F0;
+      color: #383B40;
+    }
+    .card-amount {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text-main);
+    }
+    .card-date {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+    .card-imgs {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      overflow-x: auto;
+    }
+    .card-img-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    /* ===== 记账从下往上抽屉面板 ===== */
+    .action-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(40, 44, 52, 0.22);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .action-modal.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-content {
+      width: 100%;
+      max-width: 420px;
+      max-height: 86vh;
+      background: #FFFFFF;
+      border-radius: 28px 28px 0 0;
+      padding: 20px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+      transform: translateY(100%);
+      transition: transform 0.38s var(--spring-easing);
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .action-modal.open .modal-content {
+      transform: translateY(0);
+    }
+
+    /* 抽屉顶部拖动条 */
+    .drawer-handle {
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: #E0E2E7;
+      margin: 0 auto 14px;
+    }
+
+    /* 支出 / 收入 分段选择器 */
+    .segment-control {
+      display: flex;
+      background: #EEF0F3;
+      border-radius: 12px;
+      padding: 3px;
+      margin-bottom: 16px;
+    }
+    .segment-btn {
+      flex: 1;
+      text-align: center;
+      padding: 7px 0;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-sub);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .segment-btn.active {
+      background: #FFFFFF;
+      color: var(--text-main);
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    /* 金额输入框与动态运算公式 */
+    .input-group {
+      margin-bottom: 14px;
+    }
+    .input-label {
+      font-size: 12px;
+      color: var(--text-sub);
+      margin-bottom: 6px;
+      display: block;
+    }
+    .amount-input-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: #F8F9FA;
+      border-radius: 14px;
+      padding: 10px 14px;
+      border: 1px solid #EAECEF;
+    }
+    .currency-symbol {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-right: 6px;
+    }
+    .amount-input-field {
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-main);
+      width: 100%;
+    }
+    /* 核心：动态实时结算公式条 */
+    .math-formula-hint {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--text-sub);
+      background: #F3F5F7;
+      border-radius: 8px;
+      padding: 6px 10px;
+      line-height: 1.4;
+      font-variant-numeric: tabular-nums;
+    }
+    .math-formula-hint b {
+      color: var(--text-main);
+    }
+
+    /* 标签与自定义标签系统 */
+    .tags-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .tag-chip {
+      padding: 6px 12px;
+      border-radius: 10px;
+      background: #F3F4F6;
+      font-size: 12px;
+      color: var(--text-main);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+    .tag-chip.selected {
+      background: var(--text-main);
+      color: #FFFFFF;
+      font-weight: 500;
+    }
+    .add-tag-box {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .custom-tag-input {
+      flex: 1;
+      border: 1px solid #E5E7EB;
+      background: #F9FAFB;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: var(--text-main);
+      outline: none;
+    }
+    .custom-tag-btn {
+      padding: 6px 12px;
+      background: #E5E7EB;
+      color: var(--text-main);
+      font-size: 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      border: none;
+    }
+
+    /* 截图上传区 */
+    .upload-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .upload-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 12px;
+      border: 1px dashed #D2D5DC;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      color: var(--text-sub);
+      cursor: pointer;
+      background: #FBFBFC;
+    }
+    .upload-btn svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--text-sub);
+    }
+    .upload-btn span {
+      font-size: 9px;
+    }
+    .preview-thumb-box {
+      position: relative;
+      width: 58px;
+      height: 58px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #E5E7EB;
+    }
+    .preview-thumb-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* 保存完成主按钮 */
+    .btn-save-record {
+      margin-top: 18px;
+      width: 100%;
+      padding: 12px 0;
+      border-radius: 14px;
+      background: var(--text-main);
+      color: #FFFFFF;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(71, 74, 81, 0.15);
+      transition: opacity 0.2s;
+    }
+    .btn-save-record:active {
+      opacity: 0.85;
+    }
+
+    /* “我的”个人资料区：头像与纯净无高光昵称输入 */
+    .profile-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-top: 18px;
+      margin-bottom: 6px;
+    }
+    .avatar-wrapper {
+      position: relative;
+      width: 82px;
+      height: 82px;
+      border-radius: 50%;
+      background: #ECEFF3;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 6px 18px rgba(71, 74, 81, 0.05);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+    .avatar-placeholder-svg {
+      width: 38px;
+      height: 38px;
+      fill: none;
+      stroke: var(--text-sub);
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    /* 昵称编辑框：杜绝任何边框、底线、聚焦高光 */
+    .profile-name-input {
+      border: none;
+      outline: none;
+      background: transparent;
+      text-align: center;
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-main);
+      width: 180px;
+      padding: 2px 6px;
+      box-shadow: none;
+      -webkit-appearance: none;
+    }
+    .profile-name-input:focus {
+      outline: none;
+      border: none;
+      box-shadow: none;
+    }
+
+    /* “我的”页面总金额设置卡片 */
+    .wallet-card {
+      margin-top: 14px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 4px 16px rgba(71, 74, 81, 0.03);
+    }
+    .wallet-input-row {
+      display: flex;
+      align-items: center;
+      margin-top: 8px;
+      background: #F4F5F7;
+      border-radius: 12px;
+      padding: 8px 12px;
+    }
+    .wallet-input-row input {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-main);
+      width: 100%;
+    }
+
+    /* 顶部标题行与右侧小垃圾桶按钮 */
+    .page-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .trash-toggle-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-sub);
+      transition: all 0.25s ease;
+    }
+    .trash-toggle-btn.active {
+      background: #EAECEF;
+      color: #D33;
+      border-color: #E2E4E8;
+    }
+    .trash-toggle-btn svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+    }
+
+    /* 账单卡片右上角独立删除小按键 */
+    .card-del-btn {
+      display: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #EFEFEF;
+      color: #999;
+      border: none;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      margin-left: 8px;
+    }
+    .delete-mode .card-del-btn {
+      display: inline-flex;
+    }
+
+    /* ===== 拟真收银小票弹窗 (Receipt) ===== */
+    .receipt-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(40, 44, 52, 0.35);
+      backdrop-filter: blur(12px);
+      z-index: 1100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .receipt-modal.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .receipt-paper {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      background: #FFFFFF;
+      border-radius: 16px;
+      box-shadow: 0 16px 45px rgba(0, 0, 0, 0.12);
+      padding: 24px 20px 28px;
+      font-family: -apple-system, "SF Mono", monospace, sans-serif;
+      transform: translateY(20px) scale(0.96);
+      transition: transform 0.35s var(--spring-easing);
+    }
+    .receipt-modal.open .receipt-paper {
+      transform: translateY(0) scale(1);
+    }
+    /* 小票锯齿底边 */
+    .receipt-paper::after {
+      content: "";
+      position: absolute;
+      bottom: -8px;
+      left: 0;
+      width: 100%;
+      height: 8px;
+      background: radial-gradient(circle, transparent, transparent 50%, #FFFFFF 50%, #FFFFFF 100%);
+      background-size: 14px 14px;
+    }
+    .receipt-header {
+      text-align: center;
+      border-bottom: 1px dashed #D2D5DC;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+    .receipt-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--text-main);
+    }
+    .receipt-time {
+      font-size: 10px;
+      color: var(--text-sub);
+      margin-top: 4px;
+    }
+    .receipt-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+    .receipt-row.total {
+      font-size: 16px;
+      font-weight: 700;
+      border-top: 1px dashed #D2D5DC;
+      padding-top: 10px;
+      margin-top: 10px;
+    }
+    .receipt-barcode {
+      margin-top: 18px;
+      height: 36px;
+      background: repeating-linear-gradient(90deg, #474A51 0px, #474A51 2px, transparent 2px, transparent 4px, #474A51 4px, #474A51 7px, transparent 7px, transparent 9px);
+      opacity: 0.6;
+      border-radius: 2px;
+    }
+    .receipt-close-btn {
+      margin-top: 16px;
+      width: 100%;
+      padding: 9px;
+      border-radius: 10px;
+      background: #F2F3F5;
+      color: var(--text-main);
+      font-size: 12px;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* ===== 攒钱系统专用样式 ===== */
+    .savings-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    /* 左上角时间选择器触发展示小胶囊 */
+    .time-picker-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .time-picker-pill svg {
+      width: 12px;
+      height: 12px;
+      stroke: var(--text-sub);
+    }
+
+    /* 攒钱目标卡片 */
+    .savings-goal-card {
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 16px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+      margin-bottom: 14px;
+    }
+    .goal-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+    .goal-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .goal-stats {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+    .goal-progress-track {
+      width: 100%;
+      height: 7px;
+      border-radius: 4px;
+      background: #E5E7EB;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+    .goal-progress-fill {
+      height: 100%;
+      background: var(--text-main);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    /* 周期总结卡片横条（周总结、月大总结、半年总结、一年大总结） */
+    .summary-banner {
+      background: #ECEFF3;
+      border-radius: 14px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .summary-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: var(--text-main);
+      color: #FFF;
+      font-weight: 600;
+      margin-right: 6px;
+    }
+
+    /* 攒钱记录快速输入行 */
+    .savings-input-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .savings-num-input {
+      flex: 1;
+      padding: 9px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      outline: none;
+      font-size: 13px;
+      color: var(--text-main);
+    }
+    .savings-submit-btn {
+      padding: 0 16px;
+      border-radius: 12px;
+      background: var(--text-main);
+      color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* 抽屉式时间选择面板 */
+    .time-drawer-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(40, 44, 52, 0.25);
+      backdrop-filter: blur(8px);
+      z-index: 1050;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .time-drawer-modal.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .time-drawer-content {
+      width: 100%;
+      max-width: 400px;
+      background: #FFFFFF;
+      border-radius: 24px 24px 0 0;
+      padding: 20px;
+      transform: translateY(100%);
+      transition: transform 0.35s var(--spring-easing);
+    }
+    .time-drawer-modal.open .time-drawer-content {
+      transform: translateY(0);
+    }
+    /* 上下滑动年/月滚轮容器 */
+    .picker-wheel-box {
+      position: relative;
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+      height: 180px;
+      overflow: hidden;
+      border-radius: 16px;
+      background: #F6F7F9;
+    }
+    /* 滚轮中央选中高亮浮层 */
+    .picker-wheel-selection {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      top: 50%;
+      height: 40px;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 10px;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(71, 74, 81, 0.04);
+      z-index: 1;
+    }
+    .wheel-column {
+      flex: 1;
+      height: 100%;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      padding: 70px 0;
+      z-index: 2;
+      -webkit-overflow-scrolling: touch;
+    }
+    .wheel-column::-webkit-scrollbar {
+      display: none;
+    }
+    .wheel-item {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      scroll-snap-align: center;
+      font-size: 14px;
+      color: var(--text-light);
+      cursor: pointer;
+      transition: color 0.2s, transform 0.2s;
+    }
+    .wheel-item.selected {
+      color: var(--text-main);
+      font-weight: 600;
+      transform: scale(1.08);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 柔和灰白光斑 -->
+  <div class="ambient-sphere sphere-1"></div>
+  <div class="ambient-sphere sphere-2"></div>
+
+  <!-- 内容视口 -->
+  <main class="viewport">
+    
+    <!-- Tab 0: 记账系统 (带自由拖拽加号、动态滑动节点时间轴、右上角小垃圾桶) -->
+    <section class="page active" data-page="0">
+      <div class="brand-glass-badge">
+        <span class="brand-dot"></span>
+        <span class="brand-text">攒与账-by耳机</span>
+      </div>
+      <div class="page-title-row">
+        <div>
+          <h1 class="page-header">记账系统</h1>
+          <p class="page-sub">明细流水与收支概览 (点击卡片查看小票)</p>
+        </div>
+        <!-- 右上角小垃圾桶按键 -->
+        <button class="trash-toggle-btn" id="btnToggleTrash" title="开启/退出删除模式">
+          <svg viewBox="0 0 24 24" fill="none">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- 时间轴滚动容器 -->
+      <div class="timeline-scroll-view" id="timelineScrollArea">
+        <div class="timeline-container">
+          <div class="timeline-line"></div>
+          <div class="timeline-progress" id="timelineProgress"></div>
+
+          <!-- 节点与卡片流水列表 (纯净空状态，示例卡片已全部删除) -->
+          <div id="recordsList"></div>
+        </div>
+      </div>
+
+      <!-- 可自动自由移放位置的加号按钮 -->
+      <div class="draggable-fab" id="dragAddBtn" style="bottom: 96px; right: 24px;">
+        <svg viewBox="0 0 24 24">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </div>
+    </section>
+
+    <!-- Tab 1: 攒钱系统 (支持左上角时间拉取抽屉、周期智能总结、自动跨周跨月归档) -->
+    <section class="page" data-page="1">
+      <div class="savings-header-bar">
+        <div class="brand-glass-badge" style="margin-bottom:0;">
+          <span class="brand-dot"></span>
+          <span class="brand-text">攒与账-by耳机</span>
+        </div>
+        <!-- 左上角/顶部时间选择切换胶囊 -->
+        <div class="time-picker-pill" id="btnOpenTimePicker">
+          <span id="currentPeriodLabel">2026年 · 10月</span>
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+
+      <h1 class="page-header">攒钱系统</h1>
+      <p class="page-sub">周结算清空开辟新周 · 周期大总结</p>
+
+      <div style="flex:1; overflow-y:auto; margin-top:12px; padding-bottom:90px;" class="timeline-scroll-view">
+        <!-- 攒钱目标设定卡片 -->
+        <div class="savings-goal-card">
+          <div class="goal-top">
+            <span class="goal-title" id="goalTitleDisplay">心愿储蓄池</span>
+            <span class="goal-stats" id="goalStatsDisplay">已攒 ￥0 / 目标 ￥5000</span>
+          </div>
+          <div class="goal-progress-track">
+            <div class="goal-progress-fill" id="goalProgressBar"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+            <span style="font-size:11px; color:var(--text-sub);" id="goalPercentText">完成率: 0%</span>
+            <span style="font-size:11px; color:var(--text-main); cursor:pointer; display:inline-flex; align-items:center; gap:3px;" id="btnEditGoal">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              修改目标
+            </span>
+          </div>
+        </div>
+
+        <!-- 周期自动检测总结横条 (周/月/半年/年总结) -->
+        <div id="summaryBannerArea"></div>
+
+        <!-- 用户快速存钱输入栏 -->
+        <div class="savings-input-bar">
+          <input type="number" step="1" class="savings-num-input" id="savingsAmountInput" placeholder="输入本周攒入金额 (￥)">
+          <button class="savings-submit-btn" id="btnSubmitSavings">存一笔</button>
+        </div>
+
+        <!-- 本周/本周期攒钱记录列表 (周满自动结转新开) -->
+        <div style="font-size:12px; font-weight:600; color:var(--text-main); margin-bottom:8px;" id="currentWeekTitle">本周记录流水</div>
+        <div id="savingsRecordsList"></div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Chat (文字居中：功能还在开发中，敬请期待) -->
+    <section class="page" data-page="3">
+      <div class="brand-glass-badge">
+        <span class="brand-dot"></span>
+        <span class="brand-text">攒与账-by耳机</span>
+      </div>
+      <h1 class="page-header">Chat</h1>
+      <p class="page-sub">智能账单助理</p>
+      
+      <!-- 视口纯正中心提示区 -->
+      <div class="chat-dev-center-box">
+        <svg class="chat-dev-center-icon" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span class="chat-dev-center-text">功能还在开发中，敬请期待</span>
+      </div>
+    </section>
+
+    <!-- Tab 4: 我的 (头像、昵称修改与总金额设定) -->
+    <section class="page" data-page="4">
+      <div class="brand-glass-badge">
+        <span class="brand-dot"></span>
+        <span class="brand-text">攒与账-by耳机</span>
+      </div>
+      <h1 class="page-header">我的</h1>
+      <p class="page-sub">资产汇总与个人设置</p>
+      
+      <!-- 个人信息居中卡片：头像与昵称 -->
+      <div class="profile-card">
+        <label class="avatar-wrapper" for="avatarFileInput" title="点击更换头像">
+          <!-- 默认矢量占位图 -->
+          <svg class="avatar-placeholder-svg" id="avatarPlaceholder" viewBox="0 0 24 24">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <!-- 头像展示图 -->
+          <img class="avatar-img" id="avatarImgPreview" alt="用户头像">
+        </label>
+        <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+
+        <!-- 初始名字“昵称”，纯文本体验无边框无高光 -->
+        <input type="text" class="profile-name-input" id="profileNicknameInput" value="昵称" maxlength="12" spellcheck="false" autocomplete="off" placeholder="点击输入昵称">
+      </div>
+
+      <div class="wallet-card">
+        <div style="font-size: 13px; color: var(--text-sub); font-weight: 500;">我的总资产设定 (所填总金额)</div>
+        <div class="wallet-input-row">
+          <span style="font-size: 18px; font-weight: 600; margin-right: 4px; color: var(--text-main);">￥</span>
+          <input type="number" id="globalTotalAssetInput" value="10000" placeholder="请输入你的总资产">
+        </div>
+        <div style="font-size: 11px; color: var(--text-sub); margin-top: 8px;">记账抽屉中的“花费减去”与“收入加上”将实时联动此数值。</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 底部悬浮液态玻璃导航栏 -->
+  <div class="nav-container">
+    <nav class="liquid-glass-dock" id="glassDock">
+      
+      <!-- 水滴流动拉伸胶囊 -->
+      <div class="liquid-droplet-capsule" id="dropletCapsule"></div>
+
+      <!-- Tab 0: 记账 -->
+      <div class="tab-item active" data-index="0">
+        <div class="tab-icon">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="3"></rect>
+            <path d="M7 8h10M7 12h6M7 16h8"></path>
+          </svg>
+        </div>
+        <span class="tab-label">记账</span>
+      </div>
+
+      <!-- Tab 1: 攒钱 -->
+      <div class="tab-item" data-index="1">
+        <div class="tab-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M19 11V9a4 4 0 0 0-8 0v2"></path>
+            <rect x="4" y="11" width="16" height="10" rx="3"></rect>
+            <circle cx="12" cy="16" r="2"></circle>
+          </svg>
+        </div>
+        <span class="tab-label">攒钱</span>
+      </div>
+
+      <!-- 中间操作加号（低饱和灰白玻璃感） -->
+      <div class="tab-item action-center" id="btnPlusAction">
+        <div class="plus-bubble">
+          <svg viewBox="0 0 24 24">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Tab 3: Chat -->
+      <div class="tab-item" data-index="3">
+        <div class="tab-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+          </svg>
+        </div>
+        <span class="tab-label">Chat</span>
+      </div>
+
+      <!-- Tab 4: 我的 -->
+      <div class="tab-item" data-index="4">
+        <div class="tab-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </div>
+        <span class="tab-label">我的</span>
+      </div>
+
+    </nav>
+  </div>
+
+  <!-- 记账从下往上抽屉页面 (含花费/收入双分区、公式计算、自定义标签与多图上传) -->
+  <div class="action-modal" id="actionModal">
+    <div class="modal-content">
+      <div class="drawer-handle"></div>
+
+      <!-- 分区切换器：花费 vs 收入 -->
+      <div class="segment-control">
+        <div class="segment-btn active" id="tabExpenseBtn">花费</div>
+        <div class="segment-btn" id="tabIncomeBtn">收入</div>
+      </div>
+
+      <!-- 金额输入与公式联动区 -->
+      <div class="input-group">
+        <label class="input-label" id="amountLabel">花费金额 (￥)</label>
+        <div class="amount-input-box">
+          <span class="currency-symbol">￥</span>
+          <input type="number" step="0.01" class="amount-input-field" id="recordAmountInput" placeholder="0.00">
+        </div>
+        <!-- 实时计算公式：我的所填总金额 -/+ 当前金额 = 结余 -->
+        <div class="math-formula-hint" id="mathFormulaText">
+          我的总金额 <b>￥10000.00</b> - <b>￥0.00</b> = <b>￥10000.00</b>
+        </div>
+      </div>
+
+      <!-- 【花费分区】所填项 -->
+      <div id="expenseFields">
+        <div class="input-group">
+          <label class="input-label">花费标签</label>
+          <div class="tags-container" id="expenseTagsList">
+            <span class="tag-chip selected">餐饮</span>
+            <span class="tag-chip">购物</span>
+            <span class="tag-chip">交通</span>
+            <span class="tag-chip">娱乐</span>
+            <span class="tag-chip">居住</span>
+          </div>
+          <!-- 自定义花费标签 -->
+          <div class="add-tag-box">
+            <input type="text" class="custom-tag-input" id="customTagInput" placeholder="自定义新标签">
+            <button class="custom-tag-btn" id="btnAddCustomTag">+ 添加</button>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">记录付款截图与商品截图 (选填，相册多选)</label>
+          <div class="upload-grid" id="expenseUploadGrid">
+            <label class="upload-btn">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span>相册选取</span>
+              <input type="file" id="expenseImgInput" accept="image/*" multiple style="display:none;">
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 【收入分区】所填项 -->
+      <div id="incomeFields" style="display: none;">
+        <div class="input-group">
+          <label class="input-label">收入来源</label>
+          <div class="amount-input-box">
+            <input type="text" class="amount-input-field" id="incomeSourceInput" placeholder="例如：工资、奖金、兼职" style="font-size: 14px; font-weight: 500;">
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">记录收入截图 (选填，相册多选)</label>
+          <div class="upload-grid" id="incomeUploadGrid">
+            <label class="upload-btn">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span>相册选取</span>
+              <input type="file" id="incomeImgInput" accept="image/*" multiple style="display:none;">
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 保存提交按钮 -->
+      <button class="btn-save-record" id="btnSaveRecord">保存记账</button>
+    </div>
+  </div>
+
+  <!-- 拟真收银小票详情弹窗 (Receipt) -->
+  <div class="receipt-modal" id="receiptModal">
+    <div class="receipt-paper">
+      <div class="receipt-header">
+        <div class="receipt-title" style="display:flex; align-items:center; justify-content:center; gap:6px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--text-sub)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>消费/收支明细单</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--text-sub)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <div class="receipt-time" id="receiptTimeDisplay">2026-10-24 12:00:00</div>
+      </div>
+      <div class="receipt-row">
+        <span>流水单号:</span>
+        <span id="receiptIdDisplay">NO.8827192</span>
+      </div>
+      <div class="receipt-row">
+        <span>收支类别:</span>
+        <span id="receiptTypeDisplay">花费 (支出)</span>
+      </div>
+      <div class="receipt-row">
+        <span>标签/来源:</span>
+        <span id="receiptTagDisplay">餐饮美食</span>
+      </div>
+      <div class="receipt-row total">
+        <span>结算金额</span>
+        <span id="receiptAmountDisplay">-￥0.00</span>
+      </div>
+      <!-- 附件截图缩略展示 -->
+      <div id="receiptImgsContainer" style="display:flex; gap:6px; margin-top:10px; overflow-x:auto;"></div>
+      <div class="receipt-barcode"></div>
+      <button class="receipt-close-btn" id="btnCloseReceipt">关闭小票</button>
+    </div>
+  </div>
+
+  <!-- PWA 添加到桌面/安装提示卡条 -->
+  <div class="pwa-install-banner" id="pwaInstallBanner">
+    <div style="display:flex; align-items:center;">
+      <img src="https://image.58sb.cn/file/img/eTzTvE2J.jpg" class="pwa-app-icon" alt="Account Diary">
+      <div>
+        <div style="font-size:13px; font-weight:600; color:var(--text-main);">Account Diary</div>
+        <div style="font-size:11px; color:var(--text-sub);">安装到桌面，使用更畅快</div>
+      </div>
+    </div>
+    <button class="pwa-install-btn" id="btnInstallPwa">安装应用</button>
+  </div>
+
+  <!-- 攒钱系统：平滑滑动滚轮式时间抽屉 -->
+  <div class="time-drawer-modal" id="timeDrawerModal">
+    <div class="time-drawer-content">
+      <div class="drawer-handle"></div>
+      <h3 style="font-size:15px; font-weight:600; color:var(--text-main); text-align:center;">滑动翻选时间</h3>
+      
+      <!-- 滚轮翻动视窗 -->
+      <div class="picker-wheel-box">
+        <div class="picker-wheel-selection"></div>
+        <!-- 年份上下滚动列 -->
+        <div class="wheel-column" id="wheelYearColumn"></div>
+        <!-- 月份上下滚动列 -->
+        <div class="wheel-column" id="wheelMonthColumn"></div>
+      </div>
+
+      <button class="btn-save-record" id="btnConfirmTime" style="margin-top:4px;">确认切换</button>
+    </div>
+  </div>
+
+  <script>
+    // ===== 0. 全局本地永久持久化管理 (LocalStorage) =====
+    const STORAGE_KEY_RECORDS = 'zyz_records_v1';
+    const STORAGE_KEY_ASSET   = 'zyz_asset_v1';
+    const STORAGE_KEY_SAVINGS = 'zyz_savings_v1';
+    const STORAGE_KEY_GOAL    = 'zyz_goal_v1';
+    const STORAGE_KEY_AVATAR  = 'zyz_avatar_v1';
+    const STORAGE_KEY_NAME    = 'zyz_nickname_v1';
+
+    let localRecords = JSON.parse(localStorage.getItem(STORAGE_KEY_RECORDS) || '[]');
+    let localSavings = JSON.parse(localStorage.getItem(STORAGE_KEY_SAVINGS) || '[]');
+    let localGoal    = JSON.parse(localStorage.getItem(STORAGE_KEY_GOAL) || '{"title":"心愿储蓄池","target":5000}');
+
+    const dock = document.getElementById('glassDock');
+    const droplet = document.getElementById('dropletCapsule');
+    const tabs = Array.from(document.querySelectorAll('.tab-item:not(.action-center)'));
+    const btnPlus = document.getElementById('btnPlusAction');
+    const actionModal = document.getElementById('actionModal');
+
+    let currentIndex = 0;
+
+    function getTabMetrics(tabEl) {
+      const dockRect = dock.getBoundingClientRect();
+      const tabRect = tabEl.getBoundingClientRect();
+      return {
+        left: tabRect.left - dockRect.left,
+        width: tabRect.width,
+        centerX: (tabRect.left - dockRect.left) + tabRect.width / 2
+      };
+    }
+
+    function initDroplet() {
+      const currentTab = document.querySelector(`.tab-item[data-index="${currentIndex}"]`);
+      if (!currentTab) return;
+      const m = getTabMetrics(currentTab);
+      const pad = 3;
+      droplet.style.width = `${m.width - pad * 2}px`;
+      droplet.style.left = `${m.left + pad}px`;
+      droplet.style.transform = 'scale(1, 1)';
+    }
+
+    window.addEventListener('load', () => {
+      initDroplet();
+      renderAllRecords();
+      initUserProfile();
+      initRealtimeDate();
+      renderSavingsSystem();
+    });
+    window.addEventListener('resize', initDroplet);
+
+    // 水滴滑动动效
+    function morphDroplet(fromEl, toEl) {
+      const pad = 3;
+      const fromMetrics = getTabMetrics(fromEl);
+      const toMetrics = getTabMetrics(toEl);
+      const startLeft = fromMetrics.left + pad;
+      const startWidth = fromMetrics.width - pad * 2;
+      const targetLeft = toMetrics.left + pad;
+      const targetWidth = toMetrics.width - pad * 2;
+      const deltaX = (toMetrics.centerX - fromMetrics.centerX);
+
+      const animation = droplet.animate([
+        { left: `${startLeft}px`, width: `${startWidth}px`, transform: 'scaleX(1) scaleY(1)', easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
+        { offset: 0.38, left: `${startLeft + deltaX * 0.42}px`, width: `${Math.max(startWidth, targetWidth) * 1.35}px`, transform: 'scaleX(1.22) scaleY(0.80)', easing: 'cubic-bezier(0.2, 1, 0.3, 1)' },
+        { offset: 0.72, left: `${targetLeft}px`, width: `${targetWidth * 0.94}px`, transform: 'scaleX(0.94) scaleY(1.06)', easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+        { offset: 0.88, transform: 'scaleX(1.02) scaleY(0.98)', easing: 'ease-out' },
+        { left: `${targetLeft}px`, width: `${targetWidth}px`, transform: 'scaleX(1) scaleY(1)' }
+      ], { duration: 400, fill: 'forwards' });
+
+      animation.onfinish = () => {
+        droplet.style.left = `${targetLeft}px`;
+        droplet.style.width = `${targetWidth}px`;
+        droplet.style.transform = 'scale(1, 1)';
+        animation.cancel();
+      };
+    }
+
+    function switchPage(oldIdx, newIdx) {
+      const oldPage = document.querySelector(`.page[data-page="${oldIdx}"]`);
+      const newPage = document.querySelector(`.page[data-page="${newIdx}"]`);
+      if (!newPage || oldPage === newPage) return;
+      const isRight = newIdx > oldIdx;
+      const pushDist = 28;
+
+      if (oldPage) {
+        oldPage.animate([
+          { opacity: 1, transform: 'translateX(0px)' },
+          { opacity: 0, transform: `translateX(${isRight ? -pushDist : pushDist}px)` }
+        ], { duration: 380, easing: 'cubic-bezier(0.3, 0, 0.2, 1)', fill: 'forwards' }).onfinish = () => {
+          oldPage.classList.remove('active');
+        };
+      }
+      newPage.classList.add('active');
+      newPage.animate([
+        { opacity: 0, transform: `translateX(${isRight ? pushDist : -pushDist}px)` },
+        { opacity: 1, transform: 'translateX(0px)' }
+      ], { duration: 400, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'forwards' });
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const nextIndex = parseInt(tab.dataset.index, 10);
+        if (nextIndex === currentIndex) return;
+        const currentTabEl = document.querySelector(`.tab-item[data-index="${currentIndex}"]`);
+        const nextTabEl = tab;
+        currentTabEl.classList.remove('active');
+        nextTabEl.classList.add('active');
+        nextTabEl.classList.remove('pop-trigger');
+        void nextTabEl.offsetWidth;
+        nextTabEl.classList.add('pop-trigger');
+        morphDroplet(currentTabEl, nextTabEl);
+        switchPage(currentIndex, nextIndex);
+        currentIndex = nextIndex;
+      });
+    });
+
+    // ===== 1. 加号自由移动 + 用力一抛边缘吸附 =====
+    const dragBtn = document.getElementById('dragAddBtn');
+    let isDragging = false, startX, startY, initLeft, initTop, hasMoved = false;
+    let lastTime = 0, lastX = 0, velocityX = 0;
+
+    function onPointerDown(e) {
+      isDragging = true;
+      hasMoved = false;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const rect = dragBtn.getBoundingClientRect();
+      startX = clientX; startY = clientY;
+      initLeft = rect.left; initTop = rect.top;
+      lastX = clientX; lastTime = Date.now(); velocityX = 0;
+      dragBtn.style.transition = 'none';
+    }
+
+    function onPointerMove(e) {
+      if (!isDragging) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const now = Date.now();
+      const dt = now - lastTime;
+      if (dt > 10) {
+        velocityX = (clientX - lastX) / dt;
+        lastX = clientX; lastTime = now;
+      }
+      const dx = clientX - startX; const dy = clientY - startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) hasMoved = true;
+
+      let newLeft = Math.max(12, Math.min(initLeft + dx, window.innerWidth - dragBtn.offsetWidth - 12));
+      let newTop = Math.max(60, Math.min(initTop + dy, window.innerHeight - dragBtn.offsetHeight - 80));
+      dragBtn.style.left = `${newLeft}px`;
+      dragBtn.style.top = `${newTop}px`;
+      dragBtn.style.bottom = 'auto'; dragBtn.style.right = 'auto';
+    }
+
+    function onPointerUp() {
+      if (!isDragging) return;
+      isDragging = false;
+      // 用力一抛判断
+      if (Math.abs(velocityX) > 0.45) {
+        dragBtn.style.transition = 'left 0.35s cubic-bezier(0.2, 1.4, 0.4, 1)';
+        dragBtn.style.left = velocityX < 0 ? '20px' : `${window.innerWidth - dragBtn.offsetWidth - 20}px`;
+      }
+    }
+
+    dragBtn.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+    dragBtn.addEventListener('touchstart', onPointerDown, { passive: true });
+    window.addEventListener('touchmove', onPointerMove, { passive: true });
+    window.addEventListener('touchend', onPointerUp);
+
+    dragBtn.addEventListener('click', () => { if (!hasMoved) openDrawer(); });
+    btnPlus.addEventListener('click', openDrawer);
+
+    function openDrawer() {
+      updateMathFormula();
+      actionModal.classList.add('open');
+    }
+    actionModal.addEventListener('click', (e) => {
+      if (e.target === actionModal) actionModal.classList.remove('open');
+    });
+
+    // ===== 2. 抽屉内部切换与金额计算 =====
+    let currentRecordType = 'expense';
+    const tabExpenseBtn = document.getElementById('tabExpenseBtn');
+    const tabIncomeBtn = document.getElementById('tabIncomeBtn');
+    const expenseFields = document.getElementById('expenseFields');
+    const incomeFields = document.getElementById('incomeFields');
+    const amountLabel = document.getElementById('amountLabel');
+    const recordAmountInput = document.getElementById('recordAmountInput');
+    const mathFormulaText = document.getElementById('mathFormulaText');
+    const globalTotalAssetInput = document.getElementById('globalTotalAssetInput');
+
+    // 读取持久化资产
+    const savedAsset = localStorage.getItem(STORAGE_KEY_ASSET);
+    if (savedAsset !== null) globalTotalAssetInput.value = savedAsset;
+
+    tabExpenseBtn.addEventListener('click', () => {
+      currentRecordType = 'expense';
+      tabExpenseBtn.classList.add('active'); tabIncomeBtn.classList.remove('active');
+      expenseFields.style.display = 'block'; incomeFields.style.display = 'none';
+      amountLabel.innerText = '花费金额 (￥)';
+      updateMathFormula();
+    });
+
+    tabIncomeBtn.addEventListener('click', () => {
+      currentRecordType = 'income';
+      tabIncomeBtn.classList.add('active'); tabExpenseBtn.classList.remove('active');
+      expenseFields.style.display = 'none'; incomeFields.style.display = 'block';
+      amountLabel.innerText = '收入金额 (￥)';
+      updateMathFormula();
+    });
+
+    function updateMathFormula() {
+      const baseTotal = parseFloat(globalTotalAssetInput.value) || 0;
+      const inputVal = parseFloat(recordAmountInput.value) || 0;
+      const result = currentRecordType === 'expense' ? (baseTotal - inputVal) : (baseTotal + inputVal);
+      const symbol = currentRecordType === 'expense' ? '-' : '+';
+      mathFormulaText.innerHTML = `我的总金额 <b>￥${baseTotal.toFixed(2)}</b> ${symbol} <b>￥${inputVal.toFixed(2)}</b> = <b>￥${result.toFixed(2)}</b>`;
+    }
+
+    recordAmountInput.addEventListener('input', updateMathFormula);
+    globalTotalAssetInput.addEventListener('input', () => {
+      localStorage.setItem(STORAGE_KEY_ASSET, globalTotalAssetInput.value);
+      updateMathFormula();
+    });
+
+    // 标签与相册多选
+    const expenseTagsList = document.getElementById('expenseTagsList');
+    const customTagInput = document.getElementById('customTagInput');
+    const btnAddCustomTag = document.getElementById('btnAddCustomTag');
+
+    expenseTagsList.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tag-chip')) {
+        document.querySelectorAll('#expenseTagsList .tag-chip').forEach(c => c.classList.remove('selected'));
+        e.target.classList.add('selected');
+      }
+    });
+
+    btnAddCustomTag.addEventListener('click', () => {
+      const val = customTagInput.value.trim();
+      if (!val) return;
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip selected';
+      chip.innerText = val;
+      document.querySelectorAll('#expenseTagsList .tag-chip').forEach(c => c.classList.remove('selected'));
+      expenseTagsList.appendChild(chip);
+      customTagInput.value = '';
+    });
+
+    let uploadedExpenseImgs = [], uploadedIncomeImgs = [];
+    function bindUploader(inputEl, containerEl, list) {
+      inputEl.addEventListener('change', (e) => {
+        Array.from(e.target.files).forEach(file => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            list.push(ev.target.result);
+            const box = document.createElement('div');
+            box.className = 'preview-thumb-box';
+            box.innerHTML = `<img src="${ev.target.result}">`;
+            containerEl.insertBefore(box, containerEl.firstChild);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+    }
+    bindUploader(document.getElementById('expenseImgInput'), document.getElementById('expenseUploadGrid'), uploadedExpenseImgs);
+    bindUploader(document.getElementById('incomeImgInput'), document.getElementById('incomeUploadGrid'), uploadedIncomeImgs);
+
+    // 爱心 SVG
+    const heartSvgHtml = `
+      <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    `;
+
+    // ===== 3. 保存记账与渲染 (永久存储) =====
+    const btnSaveRecord = document.getElementById('btnSaveRecord');
+    const recordsList = document.getElementById('recordsList');
+    const timelineScrollView = document.getElementById('timelineScrollArea');
+    const timelineProgress = document.getElementById('timelineProgress');
+
+    btnSaveRecord.addEventListener('click', () => {
+      const amount = parseFloat(recordAmountInput.value);
+      if (isNaN(amount) || amount <= 0) {
+        alert('请输入有效金额');
+        return;
+      }
+      const curAsset = parseFloat(globalTotalAssetInput.value) || 0;
+      const newAsset = currentRecordType === 'expense' ? (curAsset - amount) : (curAsset + amount);
+      globalTotalAssetInput.value = newAsset.toFixed(2);
+      localStorage.setItem(STORAGE_KEY_ASSET, globalTotalAssetInput.value);
+
+      let tag = '';
+      if (currentRecordType === 'expense') {
+        const s = document.querySelector('#expenseTagsList .tag-chip.selected');
+        tag = s ? s.innerText : '花费';
+      } else {
+        tag = document.getElementById('incomeSourceInput').value.trim() || '收入';
+      }
+
+      const itemData = {
+        id: 'NO.' + Math.floor(Math.random() * 899999 + 100000),
+        type: currentRecordType,
+        tag: tag,
+        amount: amount,
+        time: new Date().toLocaleString(),
+        imgs: currentRecordType === 'expense' ? [...uploadedExpenseImgs] : [...uploadedIncomeImgs]
+      };
+
+      localRecords.unshift(itemData);
+      localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(localRecords));
+
+      recordAmountInput.value = '';
+      actionModal.classList.remove('open');
+      uploadedExpenseImgs = []; uploadedIncomeImgs = [];
+      renderAllRecords();
+    });
+
+    function renderAllRecords() {
+      recordsList.innerHTML = '';
+      localRecords.forEach((item, index) => {
+        const el = document.createElement('div');
+        el.className = `timeline-item ${index === 0 ? 'active' : ''}`;
+        el.innerHTML = `
+          <div class="timeline-node">${heartSvgHtml}</div>
+          <div class="record-card" onclick="openReceipt(${index})">
+            <div class="card-top">
+              <span class="card-tag ${item.type === 'income' ? 'income' : ''}">${item.tag}</span>
+              <div style="display:flex; align-items:center;">
+                <span class="card-amount">${item.type === 'expense' ? '-' : '+'}￥${item.amount.toFixed(2)}</span>
+                <button class="card-del-btn" onclick="deleteRecord(event, ${index})" title="删除">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+            </div>
+            <div class="card-date">${item.time} · ${item.type === 'expense' ? '花费' : '收入'}</div>
+            ${item.imgs && item.imgs.length ? `<div class="card-imgs">${item.imgs.map(s => `<img class="card-img-thumb" src="${s}">`).join('')}</div>` : ''}
+          </div>
+        `;
+        recordsList.appendChild(el);
+      });
+      setTimeout(updateTimelineProgress, 50);
+    }
+
+    // 右上角小垃圾桶切换删除模式
+    const btnToggleTrash = document.getElementById('btnToggleTrash');
+    let isDeleteMode = false;
+    btnToggleTrash.addEventListener('click', () => {
+      isDeleteMode = !isDeleteMode;
+      btnToggleTrash.classList.toggle('active', isDeleteMode);
+      recordsList.classList.toggle('delete-mode', isDeleteMode);
+    });
+
+    window.deleteRecord = function(e, index) {
+      e.stopPropagation();
+      if (confirm('确认删除此记账卡片吗？')) {
+        localRecords.splice(index, 1);
+        localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(localRecords));
+        renderAllRecords();
+      }
+    };
+
+    // ===== 4. 账单小票详情弹窗展示 =====
+    const receiptModal = document.getElementById('receiptModal');
+    const btnCloseReceipt = document.getElementById('btnCloseReceipt');
+
+    window.openReceipt = function(index) {
+      if (isDeleteMode) return;
+      const record = localRecords[index];
+      if (!record) return;
+      document.getElementById('receiptTimeDisplay').innerText = record.time;
+      document.getElementById('receiptIdDisplay').innerText = record.id;
+      document.getElementById('receiptTypeDisplay').innerText = record.type === 'expense' ? '花费 (支出)' : '收入 (入账)';
+      document.getElementById('receiptTagDisplay').innerText = record.tag;
+      document.getElementById('receiptAmountDisplay').innerText = (record.type === 'expense' ? '-' : '+') + '￥' + record.amount.toFixed(2);
+      
+      const imgsBox = document.getElementById('receiptImgsContainer');
+      imgsBox.innerHTML = '';
+      if (record.imgs && record.imgs.length) {
+        record.imgs.forEach(src => {
+          const im = document.createElement('img');
+          im.src = src; im.className = 'card-img-thumb';
+          imgsBox.appendChild(im);
+        });
+      }
+      receiptModal.classList.add('open');
+    };
+
+    btnCloseReceipt.addEventListener('click', () => receiptModal.classList.remove('open'));
+    receiptModal.addEventListener('click', (e) => { if (e.target === receiptModal) receiptModal.classList.remove('open'); });
+
+    function updateTimelineProgress() {
+      const items = Array.from(document.querySelectorAll('.timeline-item'));
+      if (!items.length) { timelineProgress.style.height = '0px'; return; }
+      const viewRect = timelineScrollView.getBoundingClientRect();
+      let lastPassedIndex = 0;
+      items.forEach((item, index) => {
+        if (item.getBoundingClientRect().top <= viewRect.top + 90) {
+          lastPassedIndex = index; item.classList.add('active');
+        } else item.classList.remove('active');
+      });
+      const firstNode = items[0].querySelector('.timeline-node');
+      const currentNode = items[lastPassedIndex].querySelector('.timeline-node');
+      if (firstNode && currentNode) {
+        timelineProgress.style.height = `${Math.max(0, currentNode.getBoundingClientRect().top - firstNode.getBoundingClientRect().top)}px`;
+      }
+    }
+    timelineScrollView.addEventListener('scroll', updateTimelineProgress, { passive: true });
+
+    // ===== 5. 攒钱系统 (自动按真实当前时间启动，搭载上下滑动滚轮) =====
+    const initialRealDate = new Date();
+    let selectedYear = initialRealDate.getFullYear();
+    let selectedMonth = initialRealDate.getMonth() + 1;
+
+    let tempYear = selectedYear;
+    let tempMonth = selectedMonth;
+
+    function getWeekNumber(d) {
+      d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+
+    // 动态生成上下滑动的年、月滚轮
+    function initRealtimeDate() {
+      const yearCol = document.getElementById('wheelYearColumn');
+      const monthCol = document.getElementById('wheelMonthColumn');
+      const startYear = selectedYear - 2;
+      const endYear = selectedYear + 5;
+
+      yearCol.innerHTML = '';
+      for (let y = startYear; y <= endYear; y++) {
+        const item = document.createElement('div');
+        item.className = `wheel-item ${y === selectedYear ? 'selected' : ''}`;
+        item.innerText = `${y} 年`;
+        item.dataset.value = y;
+        yearCol.appendChild(item);
+      }
+
+      monthCol.innerHTML = '';
+      for (let m = 1; m <= 12; m++) {
+        const item = document.createElement('div');
+        item.className = `wheel-item ${m === selectedMonth ? 'selected' : ''}`;
+        item.innerText = `${m} 月`;
+        item.dataset.value = m;
+        monthCol.appendChild(item);
+      }
+
+      setupWheelListener(yearCol, (val) => { tempYear = parseInt(val, 10); });
+      setupWheelListener(monthCol, (val) => { tempMonth = parseInt(val, 10); });
+    }
+
+    function setupWheelListener(container, onChange) {
+      let scrollTimer = null;
+      container.addEventListener('scroll', () => {
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          const items = Array.from(container.querySelectorAll('.wheel-item'));
+          const containerCenter = container.getBoundingClientRect().top + container.offsetHeight / 2;
+          let closest = null, minDiff = Infinity;
+          items.forEach(el => {
+            const rect = el.getBoundingClientRect();
+            const diff = Math.abs((rect.top + rect.height / 2) - containerCenter);
+            if (diff < minDiff) { minDiff = diff; closest = el; }
+          });
+          if (closest) {
+            items.forEach(el => el.classList.remove('selected'));
+            closest.classList.add('selected');
+            onChange(closest.dataset.value);
+          }
+        }, 80);
+      }, { passive: true });
+    }
+
+    const currentPeriodLabel = document.getElementById('currentPeriodLabel');
+    const goalTitleDisplay = document.getElementById('goalTitleDisplay');
+    const goalStatsDisplay = document.getElementById('goalStatsDisplay');
+    const goalProgressBar = document.getElementById('goalProgressBar');
+    const goalPercentText = document.getElementById('goalPercentText');
+    const savingsAmountInput = document.getElementById('savingsAmountInput');
+    const btnSubmitSavings = document.getElementById('btnSubmitSavings');
+    const savingsRecordsList = document.getElementById('savingsRecordsList');
+    const summaryBannerArea = document.getElementById('summaryBannerArea');
+
+    function renderSavingsSystem() {
+      currentPeriodLabel.innerText = `${selectedYear}年 · ${selectedMonth}月`;
+      goalTitleDisplay.innerText = localGoal.title || '心愿储蓄池';
+
+      // 统计当期总攒存数
+      const totalSaved = localSavings.reduce((acc, cur) => acc + cur.amount, 0);
+      goalStatsDisplay.innerText = `已攒 ￥${totalSaved.toFixed(2)} / 目标 ￥${localGoal.target}`;
+      const pct = Math.min(100, Math.round((totalSaved / localGoal.target) * 100));
+      goalProgressBar.style.width = `${pct}%`;
+      goalPercentText.innerText = `完成率: ${pct}%`;
+
+      // 自动周期检测并输出总结横条
+      renderSummaries();
+
+      // 按“周”分组过滤当前选定年月的最新周记录，新一周下面自动空白
+      const now = new Date();
+      const currentWeek = getWeekNumber(now);
+      document.getElementById('currentWeekTitle').innerText = `${selectedYear}年 第 ${currentWeek} 周记录流水`;
+
+      savingsRecordsList.innerHTML = '';
+      const currentWeekRecords = localSavings.filter(item => {
+        const itemDate = new Date(item.timestamp);
+        return itemDate.getFullYear() === selectedYear && getWeekNumber(itemDate) === currentWeek;
+      });
+
+      if (!currentWeekRecords.length) {
+        savingsRecordsList.innerHTML = `<div style="text-align:center; padding:24px 0; color:var(--text-sub); font-size:12px;">新的一周开启，暂无攒存记录，快存一笔吧！</div>`;
+      } else {
+        currentWeekRecords.forEach(item => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex; justify-content:space-between; padding:10px 14px; background:#FFFFFF; border-radius:12px; margin-bottom:8px; font-size:13px;';
+          row.innerHTML = `<span>${new Date(item.timestamp).toLocaleDateString()} · 攒存</span><b style="color:var(--text-main);">+￥${item.amount.toFixed(2)}</b>`;
+          savingsRecordsList.appendChild(row);
+        });
+      }
+    }
+
+    // 智能总结生成器 (周总结、月大总结、半年总结、一年大总结)
+    function renderSummaries() {
+      summaryBannerArea.innerHTML = '';
+      const now = new Date();
+      const thisMonth = now.getMonth() + 1;
+
+      // 提取统计
+      const monthTotal = localSavings.filter(i => new Date(i.timestamp).getMonth() + 1 === selectedMonth).reduce((s, c) => s + c.amount, 0);
+      const halfYearTotal = localSavings.filter(i => (selectedMonth <= 6 ? new Date(i.timestamp).getMonth() + 1 <= 6 : new Date(i.timestamp).getMonth() + 1 > 6)).reduce((s, c) => s + c.amount, 0);
+      const yearTotal = localSavings.filter(i => new Date(i.timestamp).getFullYear() === selectedYear).reduce((s, c) => s + c.amount, 0);
+
+      // 月度大总结横条
+      const mBanner = document.createElement('div');
+      mBanner.className = 'summary-banner';
+      mBanner.innerHTML = `<div><span class="summary-badge">月大总结</span>${selectedMonth}月累计攒存</div><b>￥${monthTotal.toFixed(2)}</b>`;
+      summaryBannerArea.appendChild(mBanner);
+
+      // 半年总结
+      if (selectedMonth === 6 || selectedMonth === 12) {
+        const hBanner = document.createElement('div');
+        hBanner.className = 'summary-banner';
+        hBanner.innerHTML = `<div><span class="summary-badge">半年总结</span>${selectedMonth <= 6 ? '上半年' : '下半年'}储蓄沉淀</div><b>￥${halfYearTotal.toFixed(2)}</b>`;
+        summaryBannerArea.appendChild(hBanner);
+      }
+
+      // 一年大总结
+      if (selectedMonth === 12) {
+        const yBanner = document.createElement('div');
+        yBanner.className = 'summary-banner';
+        yBanner.innerHTML = `<div><span class="summary-badge">年度大总结</span>${selectedYear}年度蓄水池总额</div><b>￥${yearTotal.toFixed(2)}</b>`;
+        summaryBannerArea.appendChild(yBanner);
+      }
+    }
+
+    // 存入一笔
+    btnSubmitSavings.addEventListener('click', () => {
+      const val = parseFloat(savingsAmountInput.value);
+      if (isNaN(val) || val <= 0) {
+        alert('请输入正确的攒钱数额'); return;
+      }
+      localSavings.push({
+        amount: val,
+        timestamp: Date.now()
+      });
+      localStorage.setItem(STORAGE_KEY_SAVINGS, JSON.stringify(localSavings));
+      savingsAmountInput.value = '';
+      renderSavingsSystem();
+    });
+
+    // 修改心愿目标
+    document.getElementById('btnEditGoal').addEventListener('click', () => {
+      const newT = prompt('请输入新目标名称:', localGoal.title);
+      const newA = prompt('请输入新目标总额 (￥):', localGoal.target);
+      if (newT && newA && !isNaN(parseFloat(newA))) {
+        localGoal.title = newT;
+        localGoal.target = parseFloat(newA);
+        localStorage.setItem(STORAGE_KEY_GOAL, JSON.stringify(localGoal));
+        renderSavingsSystem();
+      }
+    });
+
+    // 时间抽屉滚轮联动定位与确认切换
+    const timeDrawerModal = document.getElementById('timeDrawerModal');
+    document.getElementById('btnOpenTimePicker').addEventListener('click', () => {
+      tempYear = selectedYear;
+      tempMonth = selectedMonth;
+      timeDrawerModal.classList.add('open');
+      setTimeout(() => {
+        // 打开时自动平滑滚动到当前选中的年和月
+        const yearCol = document.getElementById('wheelYearColumn');
+        const monthCol = document.getElementById('wheelMonthColumn');
+        const activeY = yearCol.querySelector(`.wheel-item[data-value="${selectedYear}"]`);
+        const activeM = monthCol.querySelector(`.wheel-item[data-value="${selectedMonth}"]`);
+        if (activeY) yearCol.scrollTop = activeY.offsetTop - 70;
+        if (activeM) monthCol.scrollTop = activeM.offsetTop - 70;
+      }, 50);
+    });
+    timeDrawerModal.addEventListener('click', (e) => {
+      if (e.target === timeDrawerModal) timeDrawerModal.classList.remove('open');
+    });
+
+    document.getElementById('btnConfirmTime').addEventListener('click', () => {
+      selectedYear = tempYear;
+      selectedMonth = tempMonth;
+      timeDrawerModal.classList.remove('open');
+      renderSavingsSystem();
+    });
+
+    // ===== 6. “我的”头像上传与纯净无高光昵称持久化系统 =====
+    function initUserProfile() {
+      const avatarInput = document.getElementById('avatarFileInput');
+      const avatarImg = document.getElementById('avatarImgPreview');
+      const placeholderSvg = document.getElementById('avatarPlaceholder');
+      const nicknameInput = document.getElementById('profileNicknameInput');
+
+      // 读取本地持久化头像与昵称
+      const savedAvatar = localStorage.getItem(STORAGE_KEY_AVATAR);
+      if (savedAvatar) {
+        avatarImg.src = savedAvatar;
+        avatarImg.style.display = 'block';
+        placeholderSvg.style.display = 'none';
+      }
+
+      const savedName = localStorage.getItem(STORAGE_KEY_NAME);
+      if (savedName) {
+        nicknameInput.value = savedName;
+      }
+
+      // 选取并存储头像
+      avatarInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const base64 = ev.target.result;
+          avatarImg.src = base64;
+          avatarImg.style.display = 'block';
+          placeholderSvg.style.display = 'none';
+          localStorage.setItem(STORAGE_KEY_AVATAR, base64);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // 昵称原地改动即时存储（无边框、无高光）
+      nicknameInput.addEventListener('input', () => {
+        const val = nicknameInput.value.trim();
+        localStorage.setItem(STORAGE_KEY_NAME, val || '昵称');
+      });
+      nicknameInput.addEventListener('blur', () => {
+        if (!nicknameInput.value.trim()) {
+          nicknameInput.value = '昵称';
+          localStorage.setItem(STORAGE_KEY_NAME, '昵称');
+        }
+      });
+    }
+
+    // ===== 7. PWA 安装与离线清单动态构建系统 =====
+    (function setupPWA() {
+      // 动态生成 Manifest Blob，无需依赖外部 json 文件
+      const manifestData = {
+        name: "Account Diary",
+        short_name: "Account Diary",
+        start_url: window.location.href,
+        display: "standalone",
+        background_color: "#F2F3F5",
+        theme_color: "#F2F3F5",
+        icons: [
+          {
+            src: "https://image.58sb.cn/file/img/eTzTvE2J.jpg",
+            sizes: "192x192",
+            type: "image/jpeg"
+          },
+          {
+            src: "https://image.58sb.cn/file/img/eTzTvE2J.jpg",
+            sizes: "512x512",
+            type: "image/jpeg"
+          }
+        ]
+      };
+      const stringManifest = JSON.stringify(manifestData);
+      const blob = new Blob([stringManifest], { type: 'application/json' });
+      const manifestURL = URL.createObjectURL(blob);
+      const manifestEl = document.getElementById('pwaManifestLink');
+      if (manifestEl) manifestEl.setAttribute('href', manifestURL);
+
+      // 注册标准内联 Service Worker（完美兼容 Chrome / Edge 安全策略）
+      if ('serviceWorker' in navigator) {
+        const swCode = `
+          self.addEventListener('install', e => self.skipWaiting());
+          self.addEventListener('activate', e => clients.claim());
+          self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response('offline'))));
+        `;
+        const swDataUrl = 'data:text/javascript;base64,' + btoa(swCode);
+        navigator.serviceWorker.register(swDataUrl).catch(() => {
+          // 若部分严苛环境限制 Data-URL，尝试 Blob 降级注册
+          try {
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+          } catch(err) {}
+        });
+      }
+
+      // 监听浏览器安装事件 (Chrome, Edge, Android 浏览器等)
+      let deferredPrompt = null;
+      const banner = document.getElementById('pwaInstallBanner');
+      const btnInstall = document.getElementById('btnInstallPwa');
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        banner.classList.add('show');
+      });
+
+      btnInstall.addEventListener('click', async () => {
+        if (!deferredPrompt) {
+          alert('请在浏览器右上角菜单点击“添加到主屏幕”或“安装应用”');
+          return;
+        }
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          banner.classList.remove('show');
+        }
+        deferredPrompt = null;
+      });
+
+      window.addEventListener('appinstalled', () => {
+        banner.classList.remove('show');
+      });
+    })();
+  </script>
+</body>
+</html>
